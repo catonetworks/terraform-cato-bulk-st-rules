@@ -83,6 +83,18 @@ locals {
   }
 }
 
+# Safety guard: fail plan early if the decoded JSON has 0 rules, unless the
+# caller opts in via allow_empty_policy. Protects against a truncated or
+# wrong-tenant export silently destroying every live rule.
+resource "terraform_data" "guard_empty_policy" {
+  lifecycle {
+    precondition {
+      condition     = var.allow_empty_policy || length(local.rules_by_name) > 0
+      error_message = "Policy JSON contains 0 rules. If intentional (greenfield/teardown), set allow_empty_policy = true. A truncated or wrong-tenant export would otherwise destroy the entire live policy."
+    }
+  }
+}
+
 # Optional account-level policy toggle (Split Tunnel ships disabled on new
 # tenants - without enabling it, published rules have no effect).
 resource "cato_split_tunnel_policy" "policy" {
